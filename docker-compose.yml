@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-book-store}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  backend:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./be/.env
+    environment:
+      DATABASE_HOST: db
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./fe/.env
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
