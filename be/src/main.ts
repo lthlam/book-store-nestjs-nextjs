@@ -15,6 +15,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   app.enableCors(); // Bật CORS để cho phép Next.js gọi API
-  await app.listen(4000); // Đổi sang cổng 4000 như legacy app
+  const port = process.env.PORT || 4000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on: ${port}`);
 }
 bootstrap();
