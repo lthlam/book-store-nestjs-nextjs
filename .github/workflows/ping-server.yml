@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Render Server
         run: |
-          curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -s https://food-review-nextjs-nestjs.onrender.com
+          curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" -s https://book-store-nestjs-nextjs.onrender.com
