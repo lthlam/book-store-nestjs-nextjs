@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cart } from './entities/cart.entity';
@@ -7,6 +7,8 @@ import { UpdateCartDto } from './dto/update-cart.dto';
 
 @Injectable()
 export class CartService {
+  private readonly logger = new Logger(CartService.name);
+
   constructor(
     @InjectRepository(Cart)
     private readonly cartRepository: Repository<Cart>,
@@ -17,10 +19,12 @@ export class CartService {
       items: createDto.items,
       user: { id: createDto.userId } as any,
     });
-    return this.cartRepository.save(entity);
+    const saved = await this.cartRepository.save(entity);
+    this.logger.log(`Cart created for user: ${createDto.userId}`);
+    return saved;
   }
 
-  async findAll() {
+  findAll() {
     return this.cartRepository.find({ relations: ['user'] });
   }
 

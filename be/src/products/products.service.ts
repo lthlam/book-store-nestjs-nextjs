@@ -1,15 +1,13 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-//eslint-disable-next-line
-import {
-  Repository,
-  ILike,
-  In,
-} from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { Author } from '../authors/entities/author.entity';
 import { Genre } from '../genres/entities/genre.entity';
 import { Publisher } from '../publishers/entities/publisher.entity';
+import { ProductRepository, ProductFilterOptions } from './product.repository';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
 import { UploadsService } from '../uploads/uploads.service';
@@ -19,8 +17,7 @@ export class ProductService {
   private readonly logger = new Logger(ProductService.name);
 
   constructor(
-    @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
+    private readonly productRepo: ProductRepository,
     @InjectRepository(Author)
     private readonly authorRepository: Repository<Author>,
     @InjectRepository(Genre)
@@ -30,11 +27,11 @@ export class ProductService {
     private readonly uploadsService: UploadsService,
   ) {}
 
-  async findAll(
+  findAll(
     sort?: string,
     order?: 'ASC' | 'DESC',
-    limit: number = 20,
-    page: number = 1,
+    limit = 20,
+    page = 1,
     genreId?: string,
     excludeId?: string,
     search?: string,
@@ -46,102 +43,48 @@ export class ProductService {
     rating?: number,
     isSpecial?: boolean,
   ) {
-    const qb = this.productRepository.createQueryBuilder('product');
-
-    // Relations
-    qb.leftJoinAndSelect('product.genre', 'genre');
-    qb.leftJoinAndSelect('product.author', 'author');
-    qb.leftJoinAndSelect('product.publisher', 'publisher');
-
-    // Pagination
-    qb.take(limit);
-    qb.skip((page - 1) * limit);
-
-    // Sorting
-    if (sort) {
-      qb.orderBy(`product.${sort}`, order || 'ASC');
-    } else {
-      qb.orderBy('product.title', 'ASC');
-    }
-
-    // Filters
-    if (genreId) {
-      qb.andWhere('genre.id = :genreId', { genreId });
-    }
-
-    if (excludeId) {
-      qb.andWhere('product.id != :excludeId', { excludeId });
-    }
-
-    if (search) {
-      qb.andWhere('unaccent(LOWER(product.title)) ILIKE unaccent(:search)', {
-        search: `%${search.toLowerCase()}%`,
-      });
-    }
-
-    if (genreIds && genreIds.length > 0) {
-      qb.andWhere('genre.id IN (:...genreIds)', { genreIds });
-    }
-
-    if (authorIds && authorIds.length > 0) {
-      qb.andWhere('author.id IN (:...authorIds)', { authorIds });
-    }
-
-    if (publisherIds && publisherIds.length > 0) {
-      qb.andWhere('publisher.id IN (:...publisherIds)', { publisherIds });
-    }
-
-    if (minPrice !== undefined) {
-      qb.andWhere('product.price >= :minPrice', { minPrice });
-    }
-
-    if (maxPrice !== undefined) {
-      qb.andWhere('product.price <= :maxPrice', { maxPrice });
-    }
-
-    if (rating !== undefined) {
-      qb.andWhere('product.rating >= :rating', { rating });
-    }
-
-    if (isSpecial !== undefined) {
-      qb.andWhere('product.special = :isSpecial', { isSpecial });
-    }
-
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total };
+    const opts: ProductFilterOptions = {
+      sort,
+      order,
+      limit,
+      page,
+      genreId,
+      excludeId,
+      search,
+      genreIds,
+      authorIds,
+      publisherIds,
+      minPrice,
+      maxPrice,
+      rating,
+      isSpecial,
+    };
+    return this.productRepo.findWithFilters(opts);
   }
 
   findOne(id: string) {
-    return this.productRepository.findOne({
-      where: { id } as any,
-      relations: ['genre', 'author', 'publisher'],
-      withDeleted: true,
-    });
+    return this.productRepo.findById(id);
   }
 
-  async findByIds(ids: string[]) {
-    if (!ids || ids.length === 0) return [];
-    return this.productRepository.find({
-      where: { id: In(ids) } as any,
-      relations: ['genre', 'author', 'publisher'],
-    });
+  findByIds(ids: string[]) {
+    return this.productRepo.findByIds(ids);
   }
 
-  async create(dto: any) {
+  async create(dto: CreateProductDto) {
     const { genreId, authorId, publisherId, ...rest } = dto;
-    const entity = this.productRepository.create({
+    const entity = this.productRepo.create({
       ...rest,
       ...(genreId ? { genre: { id: genreId } as any } : {}),
       ...(authorId ? { author: { id: authorId } as any } : {}),
       ...(publisherId ? { publisher: { id: publisherId } as any } : {}),
     });
-    return this.productRepository.save(entity);
+    const saved = await this.productRepo.save(entity as Product);
+    this.logger.log(`Product created: ${(saved as Product).id}`);
+    return saved;
   }
 
-  async update(id: string, dto: any) {
-    const product = await this.productRepository.findOne({
-      where: { id } as any,
-    });
+  async update(id: string, dto: UpdateProductDto) {
+    const product = await this.productRepo.findById(id);
     if (!product) throw new NotFoundException('Product not found');
 
     const { genreId, authorId, publisherId, ...rest } = dto;
@@ -150,11 +93,11 @@ export class ProductService {
     if (authorId) product.author = { id: authorId } as any;
     if (publisherId) product.publisher = { id: publisherId } as any;
 
-    return this.productRepository.save(product);
+    return this.productRepo.save(product);
   }
 
   remove(id: string) {
-    return this.productRepository.softDelete(id);
+    return this.productRepo.softDelete(id);
   }
 
   async bulkCreateFromCsv(files: any[]) {
@@ -166,7 +109,6 @@ export class ProductService {
     if (!csvFile) throw new Error('No CSV file found');
 
     const imageFiles = files.filter((f) => f !== csvFile);
-
     const firstLine = csvFile.buffer.toString().split('\n')[0];
     const separator =
       firstLine.includes(';') && !firstLine.includes(',') ? ';' : ',';
@@ -191,7 +133,7 @@ export class ProductService {
         })
         .on('end', async () => {
           try {
-            const createdProducts = [];
+            const createdProducts: Product[] = [];
             const authorCache = new Map<string, any>();
             const genreCache = new Map<string, any>();
             const publisherCache = new Map<string, any>();
@@ -209,13 +151,10 @@ export class ProductService {
                 genre,
                 publisher,
               } = row;
-
               if (!title || !price) continue;
 
-              // Image matching logic
               let finalImageUrl = image;
               if (image && !image.startsWith('http')) {
-                // Try to match with uploaded files
                 const match = imageFiles.find((f) => f.originalname === image);
                 if (match) {
                   if (uploadedImagesCache.has(image)) {
@@ -231,63 +170,62 @@ export class ProductService {
 
               let authorEntity = null;
               if (author) {
-                const aName = author.trim();
-                const aCacheKey = aName.toLowerCase();
-                if (authorCache.has(aCacheKey)) {
-                  authorEntity = authorCache.get(aCacheKey);
+                const key = author.trim().toLowerCase();
+                if (authorCache.has(key)) {
+                  authorEntity = authorCache.get(key);
                 } else {
                   authorEntity = await this.authorRepository.findOne({
-                    where: { name: ILike(aName) },
+                    where: { name: ILike(author.trim()) },
                   });
                   if (!authorEntity) {
                     authorEntity = await this.authorRepository.save(
-                      this.authorRepository.create({ name: aName }),
+                      this.authorRepository.create({ name: author.trim() }),
                     );
                   }
-                  authorCache.set(aCacheKey, authorEntity);
+                  authorCache.set(key, authorEntity);
                 }
               }
 
               let genreEntity = null;
               if (genre) {
-                const gName = genre.trim();
-                const gCacheKey = gName.toLowerCase();
-                if (genreCache.has(gCacheKey)) {
-                  genreEntity = genreCache.get(gCacheKey);
+                const key = genre.trim().toLowerCase();
+                if (genreCache.has(key)) {
+                  genreEntity = genreCache.get(key);
                 } else {
                   genreEntity = await this.genreRepository.findOne({
-                    where: { name: ILike(gName) },
+                    where: { name: ILike(genre.trim()) },
                   });
                   if (!genreEntity) {
                     genreEntity = await this.genreRepository.save(
-                      this.genreRepository.create({ name: gName }),
+                      this.genreRepository.create({ name: genre.trim() }),
                     );
                   }
-                  genreCache.set(gCacheKey, genreEntity);
+                  genreCache.set(key, genreEntity);
                 }
               }
 
               let publisherEntity = null;
               if (publisher) {
-                const pName = publisher.trim();
-                const pCacheKey = pName.toLowerCase();
-                if (publisherCache.has(pCacheKey)) {
-                  publisherEntity = publisherCache.get(pCacheKey);
+                const key = publisher.trim().toLowerCase();
+                if (publisherCache.has(key)) {
+                  publisherEntity = publisherCache.get(key);
                 } else {
                   publisherEntity = await this.publisherRepository.findOne({
-                    where: { name: ILike(pName) },
+                    where: { name: ILike(publisher.trim()) },
                   });
                   if (!publisherEntity) {
                     publisherEntity = await this.publisherRepository.save(
-                      this.publisherRepository.create({ name: pName }),
+                      this.publisherRepository.create({
+                        name: publisher.trim(),
+                      }),
                     );
                   }
-                  publisherCache.set(pCacheKey, publisherEntity);
+                  publisherCache.set(key, publisherEntity);
                 }
               }
 
               createdProducts.push(
-                this.productRepository.create({
+                this.productRepo.create({
                   title,
                   price: Number(price),
                   year: year ? Number(year) : null,
@@ -301,17 +239,17 @@ export class ProductService {
               );
             }
 
-            const saved = await this.productRepository.save(createdProducts);
+            const saved = (await this.productRepo.save(
+              createdProducts,
+            )) as Product[];
+            this.logger.log(`Bulk upload: ${saved.length} products created`);
             resolve({
               success: true,
               count: saved.length,
               message: `Successfully uploaded ${saved.length} products.`,
             });
           } catch (err) {
-            this.logger.error(
-              `Error during bulk upload: ${err.message}`,
-              err.stack,
-            );
+            this.logger.error(`Bulk upload error: ${err.message}`, err.stack);
             reject(err);
           }
         })

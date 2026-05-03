@@ -1,25 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Admin } from './entities/admin.entity';
 import { AdminsController } from './admins.controller';
 import { AdminsService } from './admins.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Admin]),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_SECRET') || 'SECRET_KEY',
-        signOptions: {
-          expiresIn: (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ||
-            '1d') as any,
-        },
-      }),
-      inject: [ConfigService],
-    }),
+    AuthModule, // Dùng chung JwtModule từ AuthModule
   ],
   controllers: [AdminsController],
   providers: [AdminsService],

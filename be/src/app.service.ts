@@ -1,16 +1,18 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 @Injectable()
 export class AppService implements OnModuleInit {
+  private readonly logger = new Logger(AppService.name);
+
   constructor(private dataSource: DataSource) {}
 
   async onModuleInit() {
     try {
       await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS unaccent');
-      console.log('PostgreSQL extension "unaccent" enabled');
+      this.logger.log('PostgreSQL extension "unaccent" enabled');
     } catch (e) {
-      console.error('Failed to enable unaccent extension:', e.message);
+      this.logger.error('Failed to enable unaccent extension', e.message);
     }
   }
 

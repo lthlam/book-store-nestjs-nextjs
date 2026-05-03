@@ -4,27 +4,47 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateNested,
+  IsInt,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class OrderItemDto {
+  @IsUUID()
+  productId: string;
+
+  @IsInt()
+  @Min(1)
+  quantity: number;
+
+  @IsNumber()
+  @Min(0)
+  price: number;
+}
 
 export class CreateOrderDto {
   @IsUUID()
   userId: string;
 
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemDto)
   @IsOptional()
-  items?: any[];
+  items?: OrderItemDto[];
 
   @IsArray()
   @IsOptional()
-  orderDetails?: any[];
+  orderDetails?: OrderItemDto[];
 
   @IsOptional()
-  address?: any;
+  address?: Record<string, any>;
 
   @IsUUID()
   @IsOptional()
   addressId?: string;
 
+  @IsNumber()
   @IsOptional()
   totalAmount?: number;
 
@@ -47,4 +67,12 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentMethod?: string;
+
+  @IsString()
+  @IsOptional()
+  couponCode?: string;
 }

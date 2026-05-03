@@ -3,50 +3,38 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Review } from './entities/review.entity';
+import { ReviewRepository } from './review.repository';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { Order } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
 
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
-    @InjectRepository(Review)
-    private readonly reviewRepository: Repository<Review>,
-    @InjectRepository(Order)
-    private readonly orderRepository: Repository<Order>,
+    private readonly reviewRepo: ReviewRepository,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
   ) {}
 
   async checkEligibility(productId: string, userId: string) {
-    // 1. Check if already reviewed
-    const existingReview = await this.reviewRepository.findOne({
-      where: { product: { id: productId } as any, user: { id: userId } as any },
-    });
+    const existingReview = await this.reviewRepo.findByProductAndUser(
+      productId,
+      userId,
+    );
     if (existingReview) {
       return { eligible: false, reason: 'ALREADY_REVIEWED' };
     }
 
-    // 2. Check if user has bought the product and it is delivered
-    const orders = await this.orderRepository.find({
-      where: { user: { id: userId } as any, status: 'delivered' },
-    });
-
-    let hasBought = false;
-    for (const order of orders) {
-      if (
-        order.orderDetails &&
-        order.orderDetails.some((item: any) => item.productId === productId)
-      ) {
-        hasBought = true;
-        break;
-      }
-    }
-
+    // Fix N+1: dùng một query JSON trong DB thay vì loop JS
+    const hasBought = await this.reviewRepo.hasUserPurchasedProduct(
+      productId,
+      userId,
+    );
     if (!hasBought) {
       return { eligible: false, reason: 'NOT_PURCHASED' };
     }
@@ -69,61 +57,43 @@ export class ReviewsService {
       );
     }
 
-    const review = this.reviewRepository.create({
+    const review = this.reviewRepo.create({
       rating: dto.rating,
       comment: dto.comment,
       product: { id: dto.productId } as any,
       user: { id: dto.userId } as any,
     });
 
-    const saved = await this.reviewRepository.save(review);
+    const saved = await this.reviewRepo.save(review);
     await this.updateProductRating(dto.productId);
+    this.logger.log(
+      `Review created for product ${dto.productId} by user ${dto.userId}`,
+    );
     return saved;
   }
 
   async updateProductRating(productId: string) {
-    const result = await this.reviewRepository
-      .createQueryBuilder('review')
-      .where('review.productId = :id', { id: productId })
-      .select('AVG(review.rating)', 'avgRating')
-      .addSelect('COUNT(review.id)', 'count')
-      .getRawOne();
-
-    const avg = parseFloat(result.avgRating) || 0;
-    const count = parseInt(result.count) || 0;
-
+    const { avgRating, count } =
+      await this.reviewRepo.getRatingStats(productId);
     await this.productRepository.update(productId, {
-      rating: Math.round(avg * 10) / 10,
+      rating: Math.round(avgRating * 10) / 10,
       reviewCount: count,
     });
   }
 
   async remove(id: string, userId: string) {
-    const review = await this.reviewRepository.findOne({
-      where: { id },
-      relations: ['user', 'product'],
-    });
-
-    if (!review) {
-      throw new NotFoundException('Không tìm thấy đánh giá.');
-    }
-
-    if (review.user.id !== userId) {
+    const review = await this.reviewRepo.findById(id);
+    if (!review) throw new NotFoundException('Không tìm thấy đánh giá.');
+    if (review.user.id !== userId)
       throw new ForbiddenException('Bạn không có quyền xoá đánh giá này.');
-    }
 
     const productId = review.product.id;
-    await this.reviewRepository.remove(review);
+    await this.reviewRepo.remove(review);
     await this.updateProductRating(productId);
-
     return { message: 'Xoá đánh giá thành công' };
   }
 
-  async findByProduct(productId: string) {
-    return this.reviewRepository.find({
-      where: { product: { id: productId } as any },
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
-    });
+  findByProduct(productId: string) {
+    return this.reviewRepo.findByProduct(productId);
   }
 }

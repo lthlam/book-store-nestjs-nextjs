@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { ProductController } from './products.controller';
 import { ProductService } from './products.service';
+import { ProductRepository } from './product.repository';
 import { Author } from '../authors/entities/author.entity';
 import { Genre } from '../genres/entities/genre.entity';
 import { Publisher } from '../publishers/entities/publisher.entity';
@@ -14,7 +15,7 @@ import { UploadsModule } from '../uploads/uploads.module';
     UploadsModule,
   ],
   controllers: [ProductController],
-  providers: [ProductService],
+  providers: [ProductService, ProductRepository],
   exports: [ProductService],
 })
 export class ProductModule {}

@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +17,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -26,19 +29,15 @@ export class UsersService {
     const user = await this.userRepository.findOne({
       where: { email: dto.email },
     });
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const isMatch = await bcrypt.compare(dto.password, user.password);
-    if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
-    if (user.isBlocked) {
+    if (user.isBlocked)
       throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
-    }
 
+    this.logger.log(`User login: ${user.email}`);
     const payload = { sub: user.id, email: user.email };
     return {
       access_token: await this.jwtService.signAsync(payload),
@@ -57,22 +56,20 @@ export class UsersService {
     });
 
     if (!user) {
-      // Create a dummy password for social users
       const randomPass = Math.random().toString(36).slice(-10);
       const hashed = await bcrypt.hash(randomPass, 10);
-
       user = this.userRepository.create({
         name: dto.name,
         email: dto.email,
         password: hashed,
-        contact: 0, // Default contact
+        contact: 0,
       });
       user = await this.userRepository.save(user);
+      this.logger.log(`Social login — new user created: ${user.email}`);
     }
 
-    if (user.isBlocked) {
+    if (user.isBlocked)
       throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
-    }
 
     const payload = { sub: user.id, email: user.email };
     return {
@@ -90,9 +87,7 @@ export class UsersService {
     const existing = await this.userRepository.findOne({
       where: { email: dto.email },
     });
-    if (existing) {
-      throw new ConflictException('Email already in use');
-    }
+    if (existing) throw new ConflictException('Email already in use');
 
     if (!dto.password || dto.password.length < 6) {
       throw new BadRequestException(
@@ -108,18 +103,19 @@ export class UsersService {
       password: hashed,
     });
 
-    return this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+    this.logger.log(`User registered: ${saved.email}`);
+    return saved;
   }
 
-  async findAll() {
+  findAll() {
     return this.userRepository.find({
       select: ['id', 'name', 'email', 'contact', 'createdAt', 'isBlocked'],
     });
   }
 
-  async findOne(id: string) {
-    const user = await this.userRepository.findOne({ where: { id } as any });
-    return user;
+  findOne(id: string) {
+    return this.userRepository.findOne({ where: { id } as any });
   }
 
   async update(id: string, dto: UpdateUserDto) {
@@ -145,7 +141,7 @@ export class UsersService {
     return this.userRepository.remove(user);
   }
 
-  async findByEmail(email: string) {
+  findByEmail(email: string) {
     return this.userRepository.findOne({ where: { email } });
   }
 }

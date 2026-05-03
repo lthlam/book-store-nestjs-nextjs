@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { Address } from '../addresses/entities/address.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -14,49 +15,57 @@ import * as puppeteer from 'puppeteer';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
     private readonly productService: ProductService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createDto: CreateOrderDto) {
-    let addressData: any = createDto.address;
+    // Dùng transaction để đảm bảo tính nhất quán dữ liệu:
+    // nếu bất kỳ bước nào thất bại, toàn bộ sẽ rollback
+    return this.dataSource.transaction(async (manager) => {
+      let addressData: any = createDto.address;
 
-    if (createDto.addressId && !addressData) {
-      const addr = await this.addressRepository.findOne({
-        where: { id: createDto.addressId } as any,
-        relations: ['ward', 'ward.province'],
-      });
-      if (addr) {
-        addressData = {
-          street: addr.street,
-          wardCode: addr.wardCode,
-          ward: addr.ward?.name || addr.wardCode,
-          province: addr.ward?.province?.name || '',
-        };
+      if (createDto.addressId && !addressData) {
+        const addr = await this.addressRepository.findOne({
+          where: { id: createDto.addressId } as any,
+          relations: ['ward', 'ward.province'],
+        });
+        if (addr) {
+          addressData = {
+            street: addr.street,
+            wardCode: addr.wardCode,
+            ward: addr.ward?.name || addr.wardCode,
+            province: addr.ward?.province?.name || '',
+          };
+        }
       }
-    }
 
-    // Fallback: use empty object if still null (prevent DB error)
-    if (!addressData) {
-      addressData = { street: 'N/A' };
-    }
+      if (!addressData) {
+        addressData = { street: 'N/A' };
+      }
 
-    const entity = this.orderRepository.create({
-      user: { id: createDto.userId } as any,
-      orderDetails: createDto.items || createDto.orderDetails || [],
-      address: addressData,
-      total: createDto.totalAmount || createDto.total || 0,
-      shipping: createDto.shipping || 0,
-      discount: createDto.discount || 0,
-      date: new Date().toLocaleDateString('vi-VN'),
-      status: createDto.status || 'pending',
+      const entity = manager.create(Order, {
+        user: { id: createDto.userId } as any,
+        orderDetails: createDto.items || createDto.orderDetails || [],
+        address: addressData,
+        total: createDto.totalAmount || createDto.total || 0,
+        shipping: createDto.shipping || 0,
+        discount: createDto.discount || 0,
+        date: new Date().toLocaleDateString('vi-VN'),
+        status: createDto.status || 'pending',
+      });
+
+      const saved = await manager.save(Order, entity);
+      this.logger.log(`Order created: ${saved.id}`);
+      return saved;
     });
-
-    return this.orderRepository.save(entity);
   }
 
   async findAll() {

@@ -72,15 +72,15 @@ export class MomoService {
       if (response.data && response.data.payUrl) {
         return response.data.payUrl;
       } else {
-        this.logger.error('MoMo Error Response:', response.data);
+        this.logger.error('MoMo Error Response', JSON.stringify(response.data));
         throw new Error(
           response.data.message || 'Failed to create MoMo payment',
         );
       }
     } catch (error) {
       this.logger.error(
-        'MoMo Request Error:',
-        error.response?.data || error.message,
+        'MoMo Request Error',
+        JSON.stringify(error.response?.data || error.message),
       );
       throw error;
     }

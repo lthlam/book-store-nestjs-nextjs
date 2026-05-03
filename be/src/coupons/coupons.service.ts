@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
@@ -11,6 +12,8 @@ import { UpdateCouponDto } from './dto/update-coupon.dto';
 
 @Injectable()
 export class CouponService {
+  private readonly logger = new Logger(CouponService.name);
+
   constructor(
     @InjectRepository(Coupon)
     private readonly couponRepository: Repository<Coupon>,
@@ -18,14 +21,16 @@ export class CouponService {
 
   async create(createDto: CreateCouponDto) {
     const entity = this.couponRepository.create(createDto);
-    return this.couponRepository.save(entity);
+    const saved = await this.couponRepository.save(entity);
+    this.logger.log(`Coupon created: ${saved.code}`);
+    return saved;
   }
 
-  async findAll() {
+  findAll() {
     return this.couponRepository.find();
   }
 
-  async findActive() {
+  findActive() {
     const now = new Date().toISOString();
     return this.couponRepository.find({
       where: {
@@ -67,10 +72,11 @@ export class CouponService {
     if (now < start)
       throw new BadRequestException('This coupon is not yet active.');
     if (now > expiry) throw new BadRequestException('This coupon has expired.');
-    if (orderTotal < Number(coupon.minimum))
+    if (orderTotal < Number(coupon.minimum)) {
       throw new BadRequestException(
         `Minimum order amount is ${Number(coupon.minimum).toLocaleString('vi-VN')} VND.`,
       );
+    }
 
     const discountVal = Number(coupon.discount);
     const discountAmount =
@@ -78,6 +84,7 @@ export class CouponService {
         ? discountVal
         : Math.round((orderTotal * discountVal) / 100);
 
+    this.logger.log(`Coupon ${code} applied — discount: ${discountAmount}`);
     return {
       id: coupon.id,
       code: coupon.code,
