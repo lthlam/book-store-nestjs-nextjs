@@ -8,7 +8,7 @@ import { Publisher } from '../publishers/entities/publisher.entity';
 import { ProductRepository, ProductFilterOptions } from './product.repository';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import { Readable } from 'stream';
 import { UploadsService } from '../uploads/uploads.service';
 
@@ -249,7 +249,7 @@ export class ProductService {
               message: `Successfully uploaded ${saved.length} products.`,
             });
           } catch (err) {
-            this.logger.error(`Bulk upload error: ${err.message}`, err.stack);
+            this.logger.error(`Bulk upload error: ${(err as any).message}`, (err as any).stack);
             reject(err);
           }
         })

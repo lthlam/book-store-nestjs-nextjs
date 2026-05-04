@@ -9,7 +9,7 @@ import * as stream from 'stream';
 @Injectable()
 export class UploadsService {
   uploadImage(
-    file: Express.Multer.File,
+    file: any,
   ): Promise<UploadApiResponse | UploadApiErrorResponse> {
     return new Promise((resolve, reject) => {
       const upload = cloudinary.uploader.upload_stream(
