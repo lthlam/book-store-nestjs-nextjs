@@ -72,7 +72,7 @@ export class MomoService {
     } catch (error) {
       this.logger.error(
         'MoMo Request Error',
-        JSON.stringify(error.response?.data || error.message),
+        JSON.stringify((error as any).response?.data || (error as any).message),
       );
       throw error;
     }

@@ -12,7 +12,7 @@ export class AppService implements OnModuleInit {
       await this.dataSource.query('CREATE EXTENSION IF NOT EXISTS unaccent');
       this.logger.log('PostgreSQL extension "unaccent" enabled');
     } catch (e) {
-      this.logger.error('Failed to enable unaccent extension', e.message);
+      this.logger.error('Failed to enable unaccent extension', (e as any).message);
     }
   }
 
