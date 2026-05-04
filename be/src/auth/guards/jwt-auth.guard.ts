@@ -18,7 +18,6 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Cho phép các route được đánh dấu @Public()
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -36,7 +35,6 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       });
-      // Gắn payload vào request để các handler có thể dùng
       request['user'] = payload;
     } catch {
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
@@ -46,6 +44,11 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractToken(request: any): string | undefined {
+    // 1. Ưu tiên cookie httpOnly (bảo mật hơn)
+    const cookieToken = request.cookies?.access_token;
+    if (cookieToken) return cookieToken;
+
+    // 2. Fallback: Authorization header (cho Swagger, mobile, v.v.)
     const [type, token] = request.headers?.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
   }

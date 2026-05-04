@@ -1,17 +1,20 @@
 import { NestFactory, Reflector } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import {
   ValidationPipe,
   ClassSerializerInterceptor,
   Logger,
 } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
 
   // --- Global Pipes ---
   app.useGlobalPipes(
@@ -31,8 +34,16 @@ async function bootstrap() {
   // --- Global Exception Filter ---
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // --- CORS ---
-  app.enableCors();
+  // --- Cookie Parser ---
+  app.use(cookieParser());
+
+  // --- CORS — cho phép credentials (cookie) từ frontend ---
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   // --- Swagger ---
   const config = new DocumentBuilder()
@@ -81,7 +92,7 @@ async function bootstrap() {
     process.exit(1);
   });
 
-  const port = process.env.PORT || 4000;
+  const port = process.env.PORT;
   const server = await app.listen(port, '0.0.0.0');
 
   const shutdown = async (signal: string) => {
@@ -101,6 +112,6 @@ async function bootstrap() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   logger.log(`Application is running on port: ${port}`);
-  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  logger.log(`Swagger docs are available at /api/docs`);
 }
 bootstrap();

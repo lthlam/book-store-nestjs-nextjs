@@ -1,18 +1,19 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import FacebookProvider from 'next-auth/providers/facebook';
+import { env } from '@/env';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const apiUrl = env.NEXT_PUBLIC_API_URL;
 
 const handler = NextAuth({
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || 'dummy-google-id',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-google-secret',
+      clientId: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
     }),
     FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID || 'dummy-fb-id',
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || 'dummy-fb-secret',
+      clientId: env.FACEBOOK_CLIENT_ID!,
+      clientSecret: env.FACEBOOK_CLIENT_SECRET!,
     }),
   ],
   callbacks: {

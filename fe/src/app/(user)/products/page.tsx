@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Search, ShoppingCart, ChevronDown, Heart, SlidersHorizontal, X, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useShop } from '../../../context/ShopContext';
-import { Product, Genre, Author, Publisher } from '@/types';
 import { toSlug } from '@/utils/slug';
-import { API_URL } from '@/utils/constants';
 import { formatVND } from '@/utils/format';
+import { useProducts } from '@/hooks/useProducts';
+import { useGenres, useAuthors, usePublishers } from '@/hooks/useCatalog';
 
 
 interface FilterOverrides {
@@ -97,82 +96,55 @@ function ProductsContent() {
     return () => clearTimeout(handler);
   }, [authorSearch]);
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [totalProducts, setTotalProducts] = useState(0);
+  // const [totalProducts, setTotalProducts] = useState(0);
   const itemsPerPage = 20;
 
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Dùng React Query thay vì fetch thủ công
+  const { data: genresData } = useGenres();
+  const { data: authorsData } = useAuthors();
+  const { data: publishersData } = usePublishers();
 
-  const fetchData = useCallback(async (page: number) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.append('limit', itemsPerPage.toString());
-      params.append('page', page.toString());
-      
-      if (searchQuery) params.append('search', searchQuery);
-      
-      if (sortBy === 'name_asc') { params.append('sort', 'title'); params.append('order', 'ASC'); }
-      if (sortBy === 'name_desc') { params.append('sort', 'title'); params.append('order', 'DESC'); }
-      if (sortBy === 'price_asc') { params.append('sort', 'price'); params.append('order', 'ASC'); }
-      if (sortBy === 'price_desc') { params.append('sort', 'price'); params.append('order', 'DESC'); }
-      if (sortBy === 'sold_desc') { params.append('sort', 'soldCount'); params.append('order', 'DESC'); }
+  const sortMap: Record<string, { sort: string; order: 'ASC' | 'DESC' }> = {
+    name_asc:   { sort: 'title',      order: 'ASC' },
+    name_desc:  { sort: 'title',      order: 'DESC' },
+    price_asc:  { sort: 'price',      order: 'ASC' },
+    price_desc: { sort: 'price',      order: 'DESC' },
+    sold_desc:  { sort: 'soldCount',  order: 'DESC' },
+  };
 
-      selectedCategory.forEach(id => params.append('genreIds', id));
-      selectedAuthors.forEach(id => params.append('authorIds', id));
-      selectedPublishers.forEach(id => params.append('publisherIds', id));
+  const { data: productsResult, isLoading: loading } = useProducts({
+    limit: itemsPerPage,
+    page: currentPage,
+    search: searchQuery || undefined,
+    sort: sortMap[sortBy]?.sort,
+    order: sortMap[sortBy]?.order,
+    genreIds: selectedCategory.length > 0 ? selectedCategory : undefined,
+    authorIds: selectedAuthors.length > 0 ? selectedAuthors : undefined,
+    publisherIds: selectedPublishers.length > 0 ? selectedPublishers : undefined,
+    minPrice: minPrice ? Number(minPrice) : undefined,
+    maxPrice: maxPrice ? Number(maxPrice) : undefined,
+    rating: activeRating ?? undefined,
+  });
 
-      if (minPrice) params.append('minPrice', minPrice);
-      if (maxPrice) params.append('maxPrice', maxPrice);
-      if (activeRating) params.append('rating', activeRating.toString());
+  const totalProducts = productsResult?.total ?? 0;
 
-      const [genresRes, productsRes, authorsRes, publishersRes] = await Promise.all([
-        fetch(`${API_URL}/genres`),
-        fetch(`${API_URL}/products?${params.toString()}`),
-        fetch(`${API_URL}/authors`),
-        fetch(`${API_URL}/publishers`)
-      ]);
-      
-      const genresData = await genresRes.json();
-      const productsData = await productsRes.json();
-      const authorsData = await authorsRes.json();
-      const publishersData = await publishersRes.json();
+  const genres = genresData ?? [];
+  const authors = authorsData ?? [];
+  const publishers = publishersData ?? [];
+  const products = useMemo(() => productsResult?.data ?? [], [productsResult?.data]);
 
-      setGenres(Array.isArray(genresData) ? genresData : []);
-      setProducts(Array.isArray(productsData.data) ? productsData.data : []);
-      setTotalProducts(productsData.total || 0);
-      setAuthors(Array.isArray(authorsData) ? authorsData : []);
-      setPublishers(Array.isArray(publishersData) ? publishersData : []);
-    } catch (error) {
-      console.error('Fetch error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery, sortBy, selectedCategory, selectedAuthors, selectedPublishers, minPrice, maxPrice, activeRating]);
-
-  useEffect(() => {
-    const load = async () => {
-      await Promise.resolve();
-      fetchData(currentPage);
-    };
-    load();
-  }, [currentPage, fetchData]);
-
-  const filteredProducts = products;
+  // useEffect(() => {
+  //   if (productsResult?.total !== undefined) setTotalProducts(productsResult.total);
+  // }, [productsResult?.total]);
 
   const applyFilters = useCallback((overrides: FilterOverrides = {}) => {
     const params = new URLSearchParams();
-    
-    // Use overrides or current temp states
     const page = overrides.page || 1;
     const search = overrides.search !== undefined ? overrides.search : tempSearch;
     const sort = overrides.sort_by || sortBy;
-    const genres = overrides.genres || tempCategory;
-    const authors = overrides.authors || tempAuthors;
-    const publishers = overrides.publishers || tempPublishers;
+    const genreList = overrides.genres || tempCategory;
+    const authorList = overrides.authors || tempAuthors;
+    const publisherList = overrides.publishers || tempPublishers;
     const minP = overrides.minPrice !== undefined ? overrides.minPrice : tempMinPrice;
     const maxP = overrides.maxPrice !== undefined ? overrides.maxPrice : tempMaxPrice;
     const rating = overrides.rating !== undefined ? overrides.rating : tempRating;
@@ -180,9 +152,9 @@ function ProductsContent() {
     if (page > 1) params.set('page', page.toString());
     if (search) params.set('search', search);
     if (sort !== 'name_asc') params.set('sort_by', sort);
-    if (genres.length > 0) params.set('genres', genres.join(','));
-    if (authors.length > 0) params.set('authors', authors.join(','));
-    if (publishers.length > 0) params.set('publishers', publishers.join(','));
+    if (genreList.length > 0) params.set('genres', genreList.join(','));
+    if (authorList.length > 0) params.set('authors', authorList.join(','));
+    if (publisherList.length > 0) params.set('publishers', publisherList.join(','));
     if (minP) params.set('minPrice', minP);
     if (maxP) params.set('maxPrice', maxP);
     if (rating) params.set('rating', rating.toString());
@@ -190,13 +162,6 @@ function ProductsContent() {
     const query = params.toString();
     router.push(`${pathname}${query ? '?' + query : ''}`, { scroll: false });
   }, [tempSearch, sortBy, tempCategory, tempAuthors, tempPublishers, tempMinPrice, tempMaxPrice, tempRating, router, pathname]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData(currentPage);
-  }, [currentPage, fetchData, searchQuery, sortBy, selectedCategory, selectedAuthors, selectedPublishers, minPrice, maxPrice, activeRating]);
-
-  // Scroll Restoration
   useEffect(() => {
     if (!loading && products.length > 0) {
       const savedScroll = sessionStorage.getItem('products-scroll-pos');
@@ -617,9 +582,9 @@ function ProductsContent() {
               </div>
             ) : (
               <>
-                {filteredProducts.length > 0 ? (
+                {products.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredProducts.map((book) => (
+                    {products.map((book) => (
                       <div key={book.id} className="group relative bg-white rounded-2xl shadow-sm border border-gray-100 p-3 hover:shadow-xl transition-all duration-300 flex flex-col h-full cursor-pointer hover:-translate-y-1">
                         {/* Full-card clickable overlay */}
                         <Link href={`/products/${toSlug(book.title)}-${book.id}`} className="absolute inset-0 z-10 rounded-2xl" aria-label={book.title} />

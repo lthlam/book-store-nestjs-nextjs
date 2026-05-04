@@ -75,6 +75,13 @@ export class OrderService {
     });
   }
 
+  async findByUser(userId: string) {
+    return this.orderRepository.find({
+      where: { user: { id: userId } } as any,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findOne(id: string) {
     const order = await this.orderRepository.findOne({
       where: { id } as any,

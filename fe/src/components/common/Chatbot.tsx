@@ -15,7 +15,7 @@ const FAQ_DATA = [
   {
     id: 'store-location',
     question: 'Cửa hàng ở đâu?',
-    answer: 'Chào bạn! DreamBook hiện có trụ sở tại Hà Nội và hỗ trợ giao hàng toàn quốc nhanh chóng trong 2-4 ngày làm việc.',
+    answer: 'Chào bạn! DreamBook hiện có trụ sở tại Thành phố Hồ Chí Minh và hỗ trợ giao hàng toàn quốc nhanh chóng trong 2-4 ngày làm việc.',
     icon: <BookOpen className="h-4 w-4" />
   },
   {

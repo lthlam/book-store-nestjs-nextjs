@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, XCircle, Loader2, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useShop } from '../../../../context/ShopContext';
+import { api } from '@/lib/axios';
 
 function MomoReturnContent() {
   const searchParams = useSearchParams();
@@ -12,26 +13,20 @@ function MomoReturnContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [orderId, setOrderId] = useState('');
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const hasVerified = useRef(false);
 
   useEffect(() => {
+    if (hasVerified.current) return;
+    if (!searchParams.get('orderId')) return;
+    hasVerified.current = true;
+
     const verifyPayment = async () => {
       try {
         const params = Object.fromEntries(searchParams.entries());
         const queryString = new URLSearchParams(params).toString();
-        
-        const res = await fetch(`${apiUrl}/orders/momo-return?${queryString}`);
-        const data = await res.json();
-
-        if (data.success) {
-          setStatus('success');
-          setOrderId(data.orderId);
-          clearCart();
-        } else {
-          setStatus('error');
-          setMessage(data.message || 'Giao dịch MoMo không thành công.');
-        }
+        const { data } = await api.get(`/orders/momo-return?${queryString}`);
+        if (data.success) { setStatus('success'); setOrderId(data.orderId); clearCart(); }
+        else { setStatus('error'); setMessage(data.message || 'Giao dịch MoMo không thành công.'); }
       } catch (error) {
         console.error('Verify error:', error);
         setStatus('error');
@@ -39,10 +34,9 @@ function MomoReturnContent() {
       }
     };
 
-    if (searchParams.get('orderId')) {
-      verifyPayment();
-    }
-  }, [searchParams, apiUrl, clearCart]);
+    verifyPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Chạy đúng 1 lần khi mount
 
   if (status === 'loading') {
     return (

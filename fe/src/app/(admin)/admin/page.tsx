@@ -1,172 +1,65 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { 
-  Users, 
-  ShoppingCart, 
-  Package, 
-  DollarSign, 
-  Plus, 
-  ArrowUpRight,
-  ExternalLink,
+  Users, ShoppingCart, Package, DollarSign, Plus, ArrowUpRight, ExternalLink,
 } from 'lucide-react';
+import Image from 'next/image';
 import { 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+  ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { API_URL } from '@/utils/constants';
+import { useState } from 'react';
+import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { formatVND } from '@/utils/format';
 
-interface Order {
-  id: string;
-  total: number;
-  status: string;
-  createdAt: string;
-}
+const COLORS = ['#8b5cf6', '#0ea5e9', '#f43f5e', '#10b981', '#f59e0b', '#ec4899'];
 
-interface Product {
-  id: string;
-  title: string;
-  image: string;
-  price: number;
-  soldCount: number;
-  genre?: { name: string };
-}
+const STATUS_MAP: Record<string, { color: string; label: string }> = {
+  pending:   { color: 'bg-orange-100 text-orange-700',  label: 'Chờ xử lý' },
+  confirmed: { color: 'bg-indigo-100 text-indigo-700',  label: 'Đã xác nhận' },
+  paid:      { color: 'bg-indigo-100 text-indigo-700',  label: 'Đã xác nhận' },
+  shipped:   { color: 'bg-amber-100 text-amber-700',    label: 'Đang vận chuyển' },
+  delivered: { color: 'bg-emerald-100 text-emerald-700',label: 'Đã hoàn thành' },
+  cancelled: { color: 'bg-rose-100 text-rose-700',      label: 'Đã hủy' },
+};
 
 export default function AdminDashboardPage() {
-  const [data, setData] = useState({
-    userCount: 0,
-    orderCount: 0,
-    productCount: 0,
-    totalRevenue: 0,
-    recentOrders: [] as Order[],
-    allOrders: [] as Order[],
-    topProducts: [] as Product[],
-    genreData: [] as { name: string, value: number, revenue: number }[]
-  });
-  const [loading, setLoading] = useState(true);
   const [chartTab, setChartTab] = useState<'revenue' | 'orders'>('revenue');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [usersRes, ordersRes, productsRes] = await Promise.all([
-          fetch(`${API_URL}/users`),
-          fetch(`${API_URL}/orders`),
-          fetch(`${API_URL}/products`)
-        ]);
-
-        const users = await usersRes.json();
-        const orders = await ordersRes.json();
-        const productsData = await productsRes.json();
-        const products = Array.isArray(productsData.data) ? productsData.data : (Array.isArray(productsData) ? productsData : []);
-
-        const revenue = Array.isArray(orders) 
-          ? orders.reduce((sum: number, order: Order) => sum + (Number(order.total) || 0), 0)
-          : 0;
-
-        // Process Top Products
-        const sortedProducts = Array.isArray(products) 
-          ? [...products].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0)).slice(0, 5)
-          : [];
-
-        // Process Genre Distribution
-        const genreMap: Record<string, { name: string, value: number, revenue: number }> = {};
-        if (Array.isArray(products)) {
-          products.forEach(p => {
-            const gName = p.genre?.name || 'Other';
-            if (!genreMap[gName]) {
-              genreMap[gName] = { name: gName, value: 0, revenue: 0 };
-            }
-            genreMap[gName].value += 1;
-            // Approximate genre revenue (this is a simplified calculation)
-            genreMap[gName].revenue += (Number(p.price) || 0) * (p.soldCount || 0);
-          });
-        }
-        const genreData = Object.values(genreMap).sort((a, b) => b.revenue - a.revenue);
-
-        setData({
-          userCount: Array.isArray(users) ? users.length : 0,
-          orderCount: Array.isArray(orders) ? orders.length : 0,
-          productCount: productsData.total ?? products.length,
-          totalRevenue: revenue,
-          recentOrders: Array.isArray(orders) ? orders.slice(0, 5) : [],
-          allOrders: Array.isArray(orders) ? orders : [],
-          topProducts: sortedProducts,
-          genreData
-        });
-      } catch (error) {
-        console.error('Dashboard fetch error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const stats = [
-    { name: 'Tổng người dùng', value: data.userCount.toLocaleString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', border: 'border-blue-100' },
-    { name: 'Tổng đơn hàng', value: data.orderCount.toLocaleString(), icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-50/50', border: 'border-indigo-100' },
-    { name: 'Tổng sản phẩm', value: data.productCount.toLocaleString(), icon: Package, color: 'text-rose-600', bg: 'bg-rose-50/50', border: 'border-rose-100' },
-    { name: 'Tổng doanh thu', value: formatVND(data.totalRevenue), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
-  ];
-
-  const COLORS = ['#8b5cf6', '#0ea5e9', '#f43f5e', '#10b981', '#f59e0b', '#ec4899'];
+  const { data, isLoading } = useAdminDashboard();
 
   const salesData = useMemo(() => {
-    if (!data.allOrders || data.allOrders.length === 0) return [];
-    const months = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
-    const monthlyData: Record<string, { name: string, revenue: number, orders: number }> = {};
-    
-    // Fill all months to ensure a continuous line
-    months.forEach(m => monthlyData[m] = { name: m, revenue: 0, orders: 0 });
-
-    data.allOrders.forEach(order => {
-      const date = new Date(order.createdAt || 0);
-      const monthName = months[date.getMonth()];
-      if (monthlyData[monthName]) {
-        monthlyData[monthName].revenue += Number(order.total || 0);
-        monthlyData[monthName].orders += 1;
-      }
+    if (!data?.allOrders?.length) return [];
+    const months = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+    const monthly: Record<string, { name: string; revenue: number; orders: number }> = {};
+    months.forEach((m) => (monthly[m] = { name: m, revenue: 0, orders: 0 }));
+    data.allOrders.forEach((order) => {
+      const m = months[new Date(order.createdAt || 0).getMonth()];
+      if (monthly[m]) { monthly[m].revenue += Number(order.total || 0); monthly[m].orders += 1; }
     });
+    return Object.values(monthly);
+  }, [data]);
 
-    return Object.values(monthlyData);
-  }, [data.allOrders]);
+  const stats = [
+    { name: 'Tổng người dùng',  value: (data?.userCount ?? 0).toLocaleString(),    icon: Users,         color: 'text-blue-600',    bg: 'bg-blue-50/50',    border: 'border-blue-100' },
+    { name: 'Tổng đơn hàng',    value: (data?.orderCount ?? 0).toLocaleString(),   icon: ShoppingCart,  color: 'text-indigo-600',  bg: 'bg-indigo-50/50',  border: 'border-indigo-100' },
+    { name: 'Tổng sản phẩm',    value: (data?.productCount ?? 0).toLocaleString(), icon: Package,       color: 'text-rose-600',    bg: 'bg-rose-50/50',    border: 'border-rose-100' },
+    { name: 'Tổng doanh thu',   value: formatVND(data?.totalRevenue ?? 0),          icon: DollarSign,    color: 'text-emerald-600', bg: 'bg-emerald-50/50', border: 'border-emerald-100' },
+  ];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
+  const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+  const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="relative">
-          <div className="h-16 w-16 border-4 border-rose-100 rounded-full"></div>
-          <div className="absolute top-0 h-16 w-16 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
+  if (isLoading) return (
+    <div className="flex h-[60vh] items-center justify-center">
+      <div className="relative">
+        <div className="h-16 w-16 border-4 border-rose-100 rounded-full" />
+        <div className="absolute top-0 h-16 w-16 border-4 border-rose-600 border-t-transparent rounded-full animate-spin" />
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <motion.div 
@@ -276,7 +169,7 @@ export default function AdminDashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data.genreData.slice(0, 5)}
+                  data={(data?.genreData ?? []).slice(0, 5)}
                   cx="50%"
                   cy="45%"
                   innerRadius={70}
@@ -285,7 +178,7 @@ export default function AdminDashboardPage() {
                   dataKey="revenue"
                   stroke="none"
                 >
-                  {data.genreData.map((entry, index) => (
+                  {(data?.genreData ?? []).map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -297,8 +190,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="mt-4 space-y-3">
             {(() => {
-              const totalGenreWeight = data.genreData.reduce((sum, g) => sum + g.revenue, 0) || 1;
-              return data.genreData.slice(0, 3).map((genre, idx) => (
+              const totalGenreWeight = (data?.genreData ?? []).reduce((sum, g) => sum + g.revenue, 0) || 1;
+              return (data?.genreData ?? []).slice(0, 3).map((genre, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
@@ -328,14 +221,15 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <div className="space-y-6">
-            {data.topProducts.map((product, idx) => (
+            {(data?.topProducts ?? []).map((product, idx) => (
               <div key={idx} className="flex items-center gap-4 group cursor-default">
                 <div className="relative h-14 w-14 rounded-2xl overflow-hidden bg-gray-100 border border-gray-100 flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
+                  <Image 
                     src={product.image || '/next.svg'} 
                     alt={product.title} 
+                    fill
                     className="w-full h-full object-cover" 
+                    unoptimized
                   />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -361,7 +255,7 @@ export default function AdminDashboardPage() {
             <Link href="/admin/orders" className="text-xs font-bold text-gray-500 hover:text-gray-900 px-3 py-1 bg-white rounded-lg border border-gray-200">Lịch sử</Link>
           </div>
           <div className="overflow-x-auto">
-            {data.recentOrders.length > 0 ? (
+            {(data?.recentOrders ?? []).length > 0 ? (
               <table className="min-w-full">
                 <thead>
                   <tr className="border-b border-gray-50">
@@ -372,7 +266,7 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {data.recentOrders.map((order, index) => (
+                  {(data?.recentOrders ?? []).map((order, index) => (
                     <tr key={index} className="hover:bg-gray-50/50 transition-colors cursor-default">
                       <td className="px-8 py-5 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -394,15 +288,7 @@ export default function AdminDashboardPage() {
                       <td className="px-8 py-5 whitespace-nowrap">
                         {(() => {
                           const s = (order.status || 'pending').toLowerCase();
-                          const map: Record<string, { color: string, label: string }> = {
-                            pending: { color: 'bg-orange-100 text-orange-700', label: 'Chờ xử lý' },
-                            confirmed: { color: 'bg-indigo-100 text-indigo-700', label: 'Đã xác nhận' },
-                            paid: { color: 'bg-indigo-100 text-indigo-700', label: 'Đã xác nhận' },
-                            shipped: { color: 'bg-amber-100 text-amber-700', label: 'Đang vận chuyển' },
-                            delivered: { color: 'bg-emerald-100 text-emerald-700', label: 'Đã hoàn thành' },
-                            cancelled: { color: 'bg-rose-100 text-rose-700', label: 'Đã hủy' },
-                          };
-                          const meta = map[s] ?? { color: 'bg-gray-100 text-gray-700', label: s };
+                          const meta = STATUS_MAP[s] ?? { color: 'bg-gray-100 text-gray-700', label: s };
                           return (
                             <span className={`px-3 py-1 inline-flex text-[10px] font-black uppercase tracking-wider rounded-lg ${meta.color}`}>
                               {meta.label}

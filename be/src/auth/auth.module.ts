@@ -1,26 +1,29 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { User } from '../users/entities/user.entity';
+import { Admin } from '../admins/entities/admin.entity';
 
-/**
- * AuthModule — module dùng chung cho JWT.
- * Thay vì mỗi module (UsersModule, AdminsModule) tự đăng ký JwtModule riêng,
- * tất cả import AuthModule này để dùng chung một JwtService instance.
- */
 @Module({
   imports: [
+    ConfigModule,
+    TypeOrmModule.forFeature([User, Admin]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_SECRET') || 'SECRET_KEY',
+        secret: configService.get<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ||
-            '1d') as any,
+          expiresIn: configService.get<string>('JWT_ACCESS_EXPIRES_IN') as any,
         },
       }),
       inject: [ConfigService],
     }),
   ],
-  exports: [JwtModule],
+  controllers: [AuthController],
+  providers: [AuthService],
+  exports: [JwtModule, AuthService],
 })
 export class AuthModule {}

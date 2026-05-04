@@ -26,7 +26,9 @@ export class ContactsController {
   }
 
   @Roles(Role.Admin)
-  @ApiOperation({ summary: '[Admin] Cập nhật trạng thái tin nhắn (new/read/replied)' })
+  @ApiOperation({
+    summary: '[Admin] Cập nhật trạng thái tin nhắn (new/read/replied)',
+  })
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,

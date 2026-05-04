@@ -9,6 +9,7 @@ import {
   Ticket, LogOut, Menu, X,
   ChevronLeft, ChevronRight, MessageSquare
 } from 'lucide-react';
+import { env } from '@/env';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -26,8 +27,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [router]);
 
-  const handleLogout = (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
+    try {
+      await fetch(`${env.NEXT_PUBLIC_API_URL}/admins/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch { /* ignore */ }
     localStorage.removeItem('admin');
     router.push('/admin-login');
   };

@@ -7,13 +7,12 @@ export default function SessionSync() {
   const { data: session } = useSession();
 
   useEffect(() => {
-    if (session && session.accessToken) {
-      const currentToken = localStorage.getItem('token');
-      if (currentToken !== session.accessToken) {
-        localStorage.setItem('token', session.accessToken);
-        localStorage.setItem('user', JSON.stringify(session.userData));
-        
-        // Force a page refresh to update all components that rely on localStorage
+    if (session && session.userData) {
+      const storedUser = localStorage.getItem('user');
+      const sessionUserStr = JSON.stringify(session.userData);
+      
+      if (storedUser !== sessionUserStr) {
+        localStorage.setItem('user', sessionUserStr);
         window.location.href = '/';
       }
     }

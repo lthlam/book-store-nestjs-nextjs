@@ -24,10 +24,14 @@ import { AuthorsModule } from './authors/authors.module';
 import { PublishersModule } from './publishers/publishers.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { HealthModule } from './health/health.module';
+import { validate } from './common/configs/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate,
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -39,7 +43,8 @@ import { HealthModule } from './health/health.module';
         database: configService.get<string>('DATABASE_NAME'),
         autoLoadEntities: true,
         synchronize: false,
-        ssl: configService.get<string>('DATABASE_SSL') === 'false' ? false : true,
+        ssl:
+          configService.get<string>('DATABASE_SSL') === 'false' ? false : true,
       }),
       inject: [ConfigService],
     }),

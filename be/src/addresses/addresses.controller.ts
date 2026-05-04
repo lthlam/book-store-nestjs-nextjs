@@ -9,12 +9,21 @@ import {
   Query,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AddressService } from './addresses.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles, Role } from '../auth/decorators/roles.decorator';
+import {
+  CurrentUser,
+  JwtPayload,
+} from '../auth/decorators/current-user.decorator';
 
 @ApiTags('addresses')
 @ApiBearerAuth('access-token')
@@ -22,10 +31,14 @@ import { Roles, Role } from '../auth/decorators/roles.decorator';
 export class AddressController {
   constructor(private readonly addressService: AddressService) {}
 
-  @ApiOperation({ summary: 'Tạo địa chỉ giao hàng mới' })
+  @ApiOperation({ summary: 'Tạo địa chỉ giao hàng mới (userId lấy từ JWT)' })
   @Post()
-  create(@Body() createDto: CreateAddressDto) {
-    return this.addressService.create(createDto);
+  create(
+    @Body() createDto: CreateAddressDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    // userId luôn lấy từ JWT — không tin vào body
+    return this.addressService.create(currentUser.sub, createDto);
   }
 
   @Roles(Role.Admin)
@@ -33,6 +46,19 @@ export class AddressController {
   @Get()
   findAll() {
     return this.addressService.findAll();
+  }
+
+  @ApiOperation({ summary: 'Lấy danh sách địa chỉ của user đang đăng nhập' })
+  @Get('my')
+  findMyAddresses(@CurrentUser() currentUser: JwtPayload) {
+    return this.addressService.findByUser(currentUser.sub);
+  }
+
+  @Roles(Role.Admin)
+  @ApiOperation({ summary: '[Admin] Lấy địa chỉ của một user cụ thể' })
+  @Get('user/:userId')
+  findByUser(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.addressService.findByUser(userId);
   }
 
   @Public()
@@ -56,15 +82,24 @@ export class AddressController {
     return this.addressService.findOne(id);
   }
 
-  @ApiOperation({ summary: 'Cập nhật địa chỉ' })
+  @ApiOperation({
+    summary: 'Cập nhật địa chỉ (chỉ được cập nhật địa chỉ của mình)',
+  })
   @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateDto: UpdateAddressDto) {
-    return this.addressService.update(id, updateDto);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDto: UpdateAddressDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.addressService.update(id, currentUser.sub, updateDto);
   }
 
-  @ApiOperation({ summary: 'Xóa địa chỉ' })
+  @ApiOperation({ summary: 'Xóa địa chỉ (chỉ được xóa địa chỉ của mình)' })
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.addressService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.addressService.remove(id, currentUser.sub);
   }
 }

@@ -11,7 +11,13 @@ import {
   UploadedFiles,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiConsumes,
+} from '@nestjs/swagger';
 import { ProductService } from './products.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Public } from '../auth/decorators/public.decorator';
@@ -74,11 +80,16 @@ export class ProductController {
       Array.isArray(val) ? val : val ? [val] : [];
 
     return this.productService.findAll(
-      sort, order,
+      sort,
+      order,
       limit ? parseInt(limit, 10) : 20,
       page ? parseInt(page, 10) : 1,
-      genreId, excludeId, search,
-      parseArray(genreIds), parseArray(authorIds), parseArray(publisherIds),
+      genreId,
+      excludeId,
+      search,
+      parseArray(genreIds),
+      parseArray(authorIds),
+      parseArray(publisherIds),
       minPrice ? parseFloat(minPrice) : undefined,
       maxPrice ? parseFloat(maxPrice) : undefined,
       rating ? parseFloat(rating) : undefined,
@@ -96,7 +107,10 @@ export class ProductController {
   @Roles(Role.Admin)
   @ApiOperation({ summary: '[Admin] Cập nhật sản phẩm' })
   @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateDto: UpdateProductDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDto: UpdateProductDto,
+  ) {
     return this.productService.update(id, updateDto);
   }
 

@@ -9,11 +9,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { JwtService } from '@nestjs/jwt';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UsersService {
@@ -22,7 +23,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -38,9 +39,9 @@ export class UsersService {
       throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
 
     this.logger.log(`User login: ${user.email}`);
-    const payload = { sub: user.id, email: user.email };
+    const tokens = await this.authService.generateUserTokens(user);
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      ...tokens,
       user: {
         id: user.id,
         name: user.name,
@@ -71,9 +72,9 @@ export class UsersService {
     if (user.isBlocked)
       throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
 
-    const payload = { sub: user.id, email: user.email };
+    const tokens = await this.authService.generateUserTokens(user);
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      ...tokens,
       user: {
         id: user.id,
         name: user.name,
@@ -118,7 +119,8 @@ export class UsersService {
     return this.userRepository.findOne({ where: { id } as any });
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  /** User tự cập nhật profile — không được thay đổi isBlocked */
+  async updateProfile(id: string, dto: UpdateProfileDto) {
     const user = await this.userRepository.findOne({ where: { id } as any });
     if (!user) throw new NotFoundException('User not found');
 
@@ -132,6 +134,17 @@ export class UsersService {
     }
 
     Object.assign(user, dto);
+    return this.userRepository.save(user);
+  }
+
+  /** Admin block/unblock user */
+  async setBlockStatus(id: string, dto: AdminUpdateUserDto) {
+    const user = await this.userRepository.findOne({ where: { id } as any });
+    if (!user) throw new NotFoundException('User not found');
+    user.isBlocked = dto.isBlocked;
+    this.logger.log(
+      `Admin ${dto.isBlocked ? 'blocked' : 'unblocked'} user: ${user.email}`,
+    );
     return this.userRepository.save(user);
   }
 

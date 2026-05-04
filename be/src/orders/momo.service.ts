@@ -15,20 +15,12 @@ export class MomoService {
 
   private getMomoConfig() {
     return {
-      partnerCode:
-        this.configService.get<string>('MOMO_PARTNER_CODE') || 'MOMO',
-      accessKey:
-        this.configService.get<string>('MOMO_ACCESS_KEY') || 'F8BBA842ECF85',
-      secretKey:
-        this.configService.get<string>('MOMO_SECRET_KEY') ||
-        'K951B6PE1waDMi640xX08PD3vg6EkVlz',
+      partnerCode: this.configService.get<string>('MOMO_PARTNER_CODE'),
+      accessKey: this.configService.get<string>('MOMO_ACCESS_KEY'),
+      secretKey: this.configService.get<string>('MOMO_SECRET_KEY'),
       endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create',
-      redirectUrl:
-        this.configService.get<string>('MOMO_REDIRECT_URL') ||
-        'http://localhost:3000/checkout/momo-return',
-      ipnUrl:
-        this.configService.get<string>('MOMO_IPN_URL') ||
-        'https://webhook.site/b3088a6a-2d17-4d8d-a383-71389a6c600b',
+      redirectUrl: this.configService.get<string>('MOMO_REDIRECT_URL'),
+      ipnUrl: this.configService.get<string>('MOMO_IPN_URL'),
     };
   }
 

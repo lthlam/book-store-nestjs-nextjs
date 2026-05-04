@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { env } from '@/env';
 
 export const runtime = 'edge';
 export const alt = 'Product Image';
@@ -12,7 +13,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const resolvedParams = await params;
   const id = resolvedParams.id;
   
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const apiUrl = env.NEXT_PUBLIC_API_URL;
   
   let product;
   try {

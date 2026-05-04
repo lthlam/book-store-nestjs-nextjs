@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, XCircle, Loader2, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useShop } from '../../../../context/ShopContext';
+import { api } from '@/lib/axios';
 
 function VNPayReturnContent() {
   const searchParams = useSearchParams();
@@ -12,18 +13,18 @@ function VNPayReturnContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [orderId, setOrderId] = useState('');
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  // Guard để đảm bảo chỉ gọi API đúng 1 lần
+  const hasVerified = useRef(false);
 
   useEffect(() => {
+    if (hasVerified.current) return;
+    hasVerified.current = true;
+
     const verifyPayment = async () => {
       try {
         const params = Object.fromEntries(searchParams.entries());
         const queryString = new URLSearchParams(params).toString();
-        
-        const res = await fetch(`${apiUrl}/orders/vnpay-return?${queryString}`);
-        const data = await res.json();
-
+        const { data } = await api.get(`/orders/vnpay-return?${queryString}`);
         if (data.success) {
           setStatus('success');
           setOrderId(data.orderId);
@@ -40,7 +41,8 @@ function VNPayReturnContent() {
     };
 
     verifyPayment();
-  }, [searchParams, apiUrl, clearCart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Chạy đúng 1 lần khi mount
 
   if (status === 'loading') {
     return (
@@ -62,7 +64,7 @@ function VNPayReturnContent() {
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Thanh toán thành công!</h2>
             <p className="text-gray-600 mb-6 px-4">Đơn hàng của bạn đã được thanh toán và đang được xử lý.</p>
-            
+
             <div className="bg-gray-50 rounded-2xl p-4 mb-8 text-left border border-gray-100">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-500">Mã đơn hàng:</span>
@@ -75,17 +77,11 @@ function VNPayReturnContent() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <Link
-                href={`/orders/${orderId}`}
-                className="flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-800 transition-all hover:scale-[1.02]"
-              >
-                Xem chi tiết đơn hàng
-                <ArrowRight className="h-4 w-4" />
+              <Link href={`/orders/${orderId}`}
+                className="flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-800 transition-all hover:scale-[1.02]">
+                Xem chi tiết đơn hàng <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link
-                href="/"
-                className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors py-2"
-              >
+              <Link href="/" className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors py-2">
                 Quay về trang chủ
               </Link>
             </div>
@@ -97,19 +93,13 @@ function VNPayReturnContent() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Thanh toán thất bại</h2>
             <p className="text-gray-600 mb-8 px-4">{message}</p>
-            
+
             <div className="flex flex-col gap-3">
-              <Link
-                href="/cart"
-                className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:bg-red-500 transition-all hover:scale-[1.02]"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                Quay lại giỏ hàng
+              <Link href="/cart"
+                className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:bg-red-500 transition-all hover:scale-[1.02]">
+                <ShoppingBag className="h-4 w-4" /> Quay lại giỏ hàng
               </Link>
-              <Link
-                href="/"
-                className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors py-2"
-              >
+              <Link href="/" className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors py-2">
                 Quay về trang chủ
               </Link>
             </div>

@@ -6,12 +6,16 @@ import {
   Patch,
   Param,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CartService } from './carts.service';
-import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
 import { Roles, Role } from '../auth/decorators/roles.decorator';
+import {
+  CurrentUser,
+  JwtPayload,
+} from '../auth/decorators/current-user.decorator';
 
 @ApiTags('carts')
 @ApiBearerAuth('access-token')
@@ -19,10 +23,13 @@ import { Roles, Role } from '../auth/decorators/roles.decorator';
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  @ApiOperation({ summary: 'Tạo giỏ hàng cho user' })
+  @ApiOperation({ summary: 'Tạo hoặc lấy giỏ hàng của user hiện tại' })
   @Post()
-  create(@Body() createDto: CreateCartDto) {
-    return this.cartService.create(createDto);
+  createOrGet(
+    @Body('items') items: any[],
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.cartService.createOrGet(currentUser.sub, items);
   }
 
   @Roles(Role.Admin)
@@ -32,21 +39,28 @@ export class CartController {
     return this.cartService.findAll();
   }
 
-  @ApiOperation({ summary: 'Lấy giỏ hàng theo ID' })
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.cartService.findOne(id);
+  @ApiOperation({ summary: 'Lấy giỏ hàng của user hiện tại' })
+  @Get('my')
+  findMy(@CurrentUser() currentUser: JwtPayload) {
+    return this.cartService.findByUser(currentUser.sub);
   }
 
-  @ApiOperation({ summary: 'Cập nhật giỏ hàng' })
+  @ApiOperation({ summary: 'Cập nhật giỏ hàng (chỉ của mình)' })
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDto: UpdateCartDto) {
-    return this.cartService.update(id, updateDto);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDto: UpdateCartDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.cartService.update(id, currentUser.sub, updateDto);
   }
 
-  @ApiOperation({ summary: 'Xóa giỏ hàng' })
+  @ApiOperation({ summary: 'Xóa giỏ hàng (chỉ của mình)' })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.cartService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.cartService.remove(id, currentUser.sub);
   }
 }

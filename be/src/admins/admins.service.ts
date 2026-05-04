@@ -7,8 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { JwtService } from '@nestjs/jwt';
 import { Admin } from './entities/admin.entity';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class AdminsService {
@@ -17,7 +17,7 @@ export class AdminsService {
   constructor(
     @InjectRepository(Admin)
     private readonly adminRepository: Repository<Admin>,
-    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
   ) {}
 
   async login(dto: { username: string; password: string }) {
@@ -30,9 +30,9 @@ export class AdminsService {
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
     this.logger.log(`Admin login: ${admin.username}`);
-    const payload = { sub: admin.id, username: admin.username, role: 'admin' };
+    const tokens = await this.authService.generateAdminTokens(admin);
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      ...tokens,
       admin: { id: admin.id, username: admin.username },
     };
   }
