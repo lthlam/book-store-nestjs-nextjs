@@ -8,9 +8,7 @@ import * as stream from 'stream';
 
 @Injectable()
 export class UploadsService {
-  uploadImage(
-    file: any,
-  ): Promise<UploadApiResponse | UploadApiErrorResponse> {
+  uploadImage(file: any): Promise<UploadApiResponse | UploadApiErrorResponse> {
     return new Promise((resolve, reject) => {
       const upload = cloudinary.uploader.upload_stream(
         { folder: 'book_store' },

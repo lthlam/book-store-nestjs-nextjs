@@ -249,7 +249,10 @@ export class ProductService {
               message: `Successfully uploaded ${saved.length} products.`,
             });
           } catch (err) {
-            this.logger.error(`Bulk upload error: ${(err as any).message}`, (err as any).stack);
+            this.logger.error(
+              `Bulk upload error: ${(err as any).message}`,
+              (err as any).stack,
+            );
             reject(err);
           }
         })

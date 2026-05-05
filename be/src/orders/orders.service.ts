@@ -11,7 +11,9 @@ import { Address } from '../addresses/entities/address.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { ProductService } from '../products/products.service';
-import * as puppeteer from 'puppeteer';
+import * as path from 'path';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfmake = require('pdfmake');
 
 @Injectable()
 export class OrderService {
@@ -168,125 +170,318 @@ export class OrderService {
       product: productMap.get(item.productId) || null,
     }));
 
-    const html = this.buildInvoiceHTML(order, enrichedDetails);
+    const fonts = {
+      Roboto: {
+        normal: path.join(
+          process.cwd(),
+          'node_modules/pdfmake/fonts/Roboto/Roboto-Regular.ttf',
+        ),
+        bold: path.join(
+          process.cwd(),
+          'node_modules/pdfmake/fonts/Roboto/Roboto-Medium.ttf',
+        ),
+        italics: path.join(
+          process.cwd(),
+          'node_modules/pdfmake/fonts/Roboto/Roboto-Italic.ttf',
+        ),
+        bolditalics: path.join(
+          process.cwd(),
+          'node_modules/pdfmake/fonts/Roboto/Roboto-MediumItalic.ttf',
+        ),
+      },
+    };
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
-    });
-    await browser.close();
+    pdfmake.setFonts(fonts);
+    const docDefinition = this.buildInvoicePdfMake(order, enrichedDetails);
 
-    return pdf as Buffer;
+    const doc = pdfmake.createPdf(docDefinition);
+    return doc.getBuffer();
   }
 
-  private buildInvoiceHTML(order: Order, items: any[]) {
+  private buildInvoicePdfMake(order: Order, items: any[]): any {
     const formatVND = (v: number) =>
       Number(v).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-          .invoice-box { width: 100%; padding: 30px; }
-        </style>
-      </head>
-      <body class="bg-white">
-        <div class="invoice-box">
-          <div class="flex justify-between items-center mb-10">
-            <div>
-              <h1 class="text-3xl font-bold text-gray-900 mb-1">DreamBook</h1>
-              <p class="text-sm text-gray-500 italic">Reading is dreaming with open eyes</p>
-            </div>
-            <div class="text-right">
-              <h2 class="text-2xl font-bold text-red-600">INVOICE</h2>
-              <p class="text-sm text-gray-500 font-mono mt-1">#${order.id.slice(0, 8).toUpperCase()}</p>
-              <p class="text-sm text-gray-500">Date: ${new Date(order.createdAt).toLocaleDateString('en-CA')}</p>
-            </div>
-          </div>
+    const totalDue = Number(order.total);
+    const subTotal =
+      totalDue + Number(order.discount || 0) - Number(order.shipping || 0);
 
-          <div class="grid grid-cols-2 gap-8 mb-10">
-            <div>
-              <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Billed To</h3>
-              <p class="text-gray-900 font-bold text-lg">${order.user?.name || 'Customer'}</p>
-              <p class="text-gray-600">${order.user?.email || ''}</p>
-            </div>
-            <div class="text-right">
-              <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Shipping Information</h3>
-              <p class="text-gray-700">${order.address?.street || 'N/A'}</p>
-              <p class="text-gray-700">${order.address?.ward || ''}, ${order.address?.province || ''}</p>
-            </div>
-          </div>
-
-          <table class="w-full mb-10">
-            <thead>
-              <tr class="border-b-2 border-gray-100 text-left">
-                <th class="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Item</th>
-                <th class="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Qty</th>
-                <th class="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Price</th>
-                <th class="py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items
-                .map(
-                  (item) => `
-                <tr class="border-b border-gray-50">
-                  <td class="py-5">
-                    <p class="text-gray-900 font-bold">${item.product?.title || 'Unknown Product'}</p>
-                    <p class="text-xs text-gray-400">ID: ${item.productId.slice(0, 8)}</p>
-                  </td>
-                  <td class="py-5 text-center text-gray-700">${item.quantity}</td>
-                  <td class="py-5 text-right text-gray-700">${formatVND(item.price)}</td>
-                  <td class="py-5 text-right font-bold text-gray-900">${formatVND(item.price * item.quantity)}</td>
-                </tr>
-              `,
-                )
-                .join('')}
-            </tbody>
-          </table>
-
-          <div class="flex justify-end pt-5 border-t-2 border-gray-100">
-            <div class="w-64">
-              <div class="flex justify-between mb-2">
-                <span class="text-gray-500 font-medium">Subtotal</span>
-                <span class="text-gray-900 font-bold">${formatVND(Number(order.total) + Number(order.discount) - Number(order.shipping || 0))}</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-gray-500 font-medium">Discount</span>
-                <span class="text-green-600 font-bold">-${formatVND(order.discount)}</span>
-              </div>
-              <div class="flex justify-between mb-4 pb-4 border-b border-gray-50">
-                <span class="text-gray-500 font-medium">Shipping</span>
-                <span class="text-gray-900 font-bold">${formatVND(order.shipping || 0)}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-gray-900 font-black text-lg">Total Due</span>
-                <span class="text-red-600 font-black text-2xl">${formatVND(order.total)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-20 pt-10 border-t border-gray-100 text-center">
-            <p class="text-gray-400 text-sm font-medium tracking-wide">Thank you for choosing DreamBook</p>
-            <div class="flex justify-center gap-4 mt-2">
-              <span class="text-[10px] text-gray-300">ModernBook.com</span>
-              <span class="text-[10px] text-gray-300">support@modernbook.com</span>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    return {
+      content: [
+        {
+          columns: [
+            {
+              text: [
+                {
+                  text: 'DreamBook\n',
+                  fontSize: 24,
+                  bold: true,
+                  color: '#111827',
+                },
+                {
+                  text: 'Reading is dreaming with open eyes',
+                  fontSize: 10,
+                  italics: true,
+                  color: '#6B7280',
+                },
+              ],
+            },
+            {
+              text: [
+                {
+                  text: 'INVOICE\n',
+                  fontSize: 20,
+                  bold: true,
+                  color: '#DC2626',
+                },
+                {
+                  text: `#${order.id.slice(0, 8).toUpperCase()}\n`,
+                  fontSize: 10,
+                  color: '#6B7280',
+                  margin: [0, 5, 0, 0],
+                },
+                {
+                  text: `Date: ${new Date(order.createdAt).toLocaleDateString('en-CA')}`,
+                  fontSize: 10,
+                  color: '#6B7280',
+                },
+              ],
+              alignment: 'right',
+            },
+          ],
+          margin: [0, 0, 0, 40],
+        },
+        {
+          columns: [
+            {
+              text: [
+                {
+                  text: 'BILLED TO\n',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  margin: [0, 0, 0, 5],
+                },
+                {
+                  text: `${order.user?.name || 'Customer'}\n`,
+                  fontSize: 12,
+                  bold: true,
+                  color: '#111827',
+                },
+                {
+                  text: `${order.user?.email || ''}`,
+                  fontSize: 10,
+                  color: '#4B5563',
+                },
+              ],
+            },
+            {
+              text: [
+                {
+                  text: 'SHIPPING INFORMATION\n',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  margin: [0, 0, 0, 5],
+                },
+                {
+                  text: `${order.address?.street || 'N/A'}\n`,
+                  fontSize: 10,
+                  color: '#374151',
+                },
+                {
+                  text: `${order.address?.ward || ''}, ${order.address?.province || ''}`,
+                  fontSize: 10,
+                  color: '#374151',
+                },
+              ],
+              alignment: 'right',
+            },
+          ],
+          margin: [0, 0, 0, 40],
+        },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', 'auto', 'auto', 'auto'],
+            body: [
+              [
+                {
+                  text: 'ITEM',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  border: [false, false, false, true],
+                },
+                {
+                  text: 'QTY',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  alignment: 'center',
+                  border: [false, false, false, true],
+                },
+                {
+                  text: 'PRICE',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  alignment: 'right',
+                  border: [false, false, false, true],
+                },
+                {
+                  text: 'TOTAL',
+                  fontSize: 10,
+                  bold: true,
+                  color: '#9CA3AF',
+                  alignment: 'right',
+                  border: [false, false, false, true],
+                },
+              ],
+              ...items.map((item) => [
+                {
+                  text: [
+                    {
+                      text: `${item.product?.title || 'Unknown Product'}\n`,
+                      bold: true,
+                      color: '#111827',
+                    },
+                    {
+                      text: `ID: ${item.productId.slice(0, 8)}`,
+                      fontSize: 8,
+                      color: '#9CA3AF',
+                    },
+                  ],
+                  margin: [0, 5, 0, 5],
+                  border: [false, false, false, true],
+                },
+                {
+                  text: item.quantity.toString(),
+                  alignment: 'center',
+                  margin: [0, 5, 0, 5],
+                  color: '#374151',
+                  border: [false, false, false, true],
+                },
+                {
+                  text: formatVND(item.price),
+                  alignment: 'right',
+                  margin: [0, 5, 0, 5],
+                  color: '#374151',
+                  border: [false, false, false, true],
+                },
+                {
+                  text: formatVND(item.price * item.quantity),
+                  alignment: 'right',
+                  bold: true,
+                  margin: [0, 5, 0, 5],
+                  color: '#111827',
+                  border: [false, false, false, true],
+                },
+              ]),
+            ],
+          },
+          layout: {
+            defaultBorder: false,
+            hLineWidth: function (i: number) {
+              return i === 1 ? 1 : 0.5;
+            },
+            hLineColor: function () {
+              return '#F3F4F6';
+            },
+          },
+          margin: [0, 0, 0, 40],
+        },
+        {
+          columns: [
+            { width: '*', text: '' },
+            {
+              width: 200,
+              table: {
+                widths: ['*', 'auto'],
+                body: [
+                  [
+                    { text: 'Subtotal', color: '#6B7280' },
+                    {
+                      text: formatVND(subTotal),
+                      alignment: 'right',
+                      bold: true,
+                      color: '#111827',
+                    },
+                  ],
+                  [
+                    { text: 'Discount', color: '#6B7280' },
+                    {
+                      text: `-${formatVND(order.discount || 0)}`,
+                      alignment: 'right',
+                      bold: true,
+                      color: '#16A34A',
+                    },
+                  ],
+                  [
+                    {
+                      text: 'Shipping',
+                      color: '#6B7280',
+                      border: [false, false, false, true],
+                    },
+                    {
+                      text: formatVND(order.shipping || 0),
+                      alignment: 'right',
+                      bold: true,
+                      color: '#111827',
+                      border: [false, false, false, true],
+                    },
+                  ],
+                  [
+                    {
+                      text: 'Total Due',
+                      fontSize: 14,
+                      bold: true,
+                      color: '#111827',
+                      margin: [0, 10, 0, 0],
+                    },
+                    {
+                      text: formatVND(totalDue),
+                      fontSize: 16,
+                      bold: true,
+                      color: '#DC2626',
+                      alignment: 'right',
+                      margin: [0, 10, 0, 0],
+                    },
+                  ],
+                ],
+              },
+              layout: {
+                defaultBorder: false,
+                hLineWidth: function (i: number) {
+                  return i === 3 ? 1 : 0;
+                },
+                hLineColor: function () {
+                  return '#F3F4F6';
+                },
+              },
+            },
+          ],
+        },
+        {
+          text: [
+            {
+              text: 'Thank you for choosing DreamBook\n',
+              fontSize: 10,
+              color: '#9CA3AF',
+            },
+            {
+              text: 'Dreambook  •   support@dreambook.vn',
+              fontSize: 8,
+              color: '#D1D5DB',
+            },
+          ],
+          alignment: 'center',
+          margin: [0, 60, 0, 0],
+        },
+      ],
+      defaultStyle: {
+        font: 'Roboto',
+      },
+    };
   }
 }
