@@ -28,6 +28,8 @@ export default function AdminProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; id: string; title: string }>({ open: false, id: '', title: '' });
   const [quickAdd, setQuickAdd] = useState<'genre' | 'author' | 'publisher' | null>(null);
   const [quickVal, setQuickVal] = useState('');
@@ -60,32 +62,113 @@ export default function AdminProductsPage() {
   const products = productsData?.data ?? [];
   const total = productsData?.total ?? 0;
 
-  const openAdd = () => { setEditingId(null); setForm(emptyForm); setShowModal(true); };
+  const openAdd = () => { setEditingId(null); setForm(emptyForm); setPreviewUrl(null); setSelectedFile(null); setShowModal(true); };
   const openEdit = (p: Product) => {
     setEditingId(p.id);
     setForm({ title: p.title || '', authorId: p.author?.id || '', price: String(p.price || ''), year: String(p.year || ''), description: p.description || '', genreId: p.genre?.id || '', publisherId: p.publisher?.id || '', image: p.image || '', special: p.special || false });
+    setPreviewUrl(null); setSelectedFile(null);
     setShowModal(true);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    const result = await uploadImage.mutateAsync(fd);
-    setForm((f) => ({ ...f, image: result.url }));
+
+    // 1. Kiểm tra kích thước và nén ảnh
+    const processImage = (file: File): Promise<File | null> => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new window.Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            const width = img.width;
+            const height = img.height;
+
+            // Kiểm tra tối thiểu 700px cho ít nhất 1 chiều
+            if (width < 700 && height < 700) {
+              toast.error('Ảnh quá nhỏ! Ít nhất một chiều phải đạt tối thiểu 700px.');
+              resolve(null);
+              return;
+            }
+
+            const canvas = document.createElement('canvas');
+            let targetWidth = width;
+            let targetHeight = height;
+            const MAX_SIZE = 1200;
+
+            // Chỉ resize nếu ảnh quá lớn (> 1200px)
+            if (width > MAX_SIZE || height > MAX_SIZE) {
+              if (width > height) {
+                targetHeight = Math.round(height * (MAX_SIZE / width));
+                targetWidth = MAX_SIZE;
+              } else {
+                targetWidth = Math.round(width * (MAX_SIZE / height));
+                targetHeight = MAX_SIZE;
+              }
+            }
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+              } else {
+                resolve(file);
+              }
+            }, 'image/jpeg', 0.6); // Nén chất lượng 60%
+          };
+        };
+      });
+    };
+
+    const processedFile = await processImage(file);
+    if (!processedFile) return;
+
+    setSelectedFile(processedFile);
+    setPreviewUrl(URL.createObjectURL(processedFile));
   };
 
   const handleSave = async () => {
-    const body = { title: form.title, authorId: form.authorId, publisherId: form.publisherId, price: Number(form.price), year: Number(form.year), description: form.description, genreId: form.genreId, image: form.image, special: form.special };
-    if (editingId) {
-      await updateProduct.mutateAsync({ id: editingId, ...body });
-      toast.success('Cập nhật sản phẩm thành công!');
-    } else {
-      await createProduct.mutateAsync(body);
-      toast.success('Tạo sản phẩm thành công!');
+    try {
+      let imageUrl = form.image;
+
+      // Nếu có chọn file mới -> Upload lên Cloudinary trước khi save product
+      if (selectedFile) {
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        const uploadRes = await uploadImage.mutateAsync(fd);
+        imageUrl = uploadRes.url;
+      }
+
+      const body = { 
+        title: form.title, 
+        authorId: form.authorId, 
+        publisherId: form.publisherId, 
+        price: Number(form.price), 
+        year: Number(form.year), 
+        description: form.description, 
+        genreId: form.genreId, 
+        image: imageUrl, 
+        special: form.special 
+      };
+
+      if (editingId) {
+        await updateProduct.mutateAsync({ id: editingId, ...body });
+        toast.success('Cập nhật sản phẩm thành công!');
+      } else {
+        await createProduct.mutateAsync(body);
+        toast.success('Tạo sản phẩm thành công!');
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Có lỗi xảy ra khi lưu sản phẩm');
     }
-    setShowModal(false);
   };
 
   const handleDelete = async () => {
@@ -257,12 +340,22 @@ export default function AdminProductsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh sản phẩm</label>
                 <div className="flex items-center gap-4">
-                  {form.image && <div className="h-20 w-20 relative flex-shrink-0 bg-gray-100 border rounded-lg overflow-hidden"><Image src={form.image} alt="Preview" fill className="w-full h-full object-contain p-1" unoptimized /></div>}
-                  <label className="flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-red-400 hover:text-red-500 transition-colors">
-                    <Upload className="h-4 w-4" />
-                    {uploadImage.isPending ? 'Đang tải lên...' : 'Tải ảnh lên'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadImage.isPending} />
-                  </label>
+                  {(previewUrl || form.image) && (
+                    <div className="h-20 w-20 relative flex-shrink-0 bg-gray-100 border rounded-lg overflow-hidden">
+                      <Image 
+                        src={previewUrl || form.image} 
+                        alt="Preview" 
+                        fill 
+                        className="w-full h-full object-contain p-1" 
+                        unoptimized 
+                      />
+                    </div>
+                  )}
+                    <label className="flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-red-400 hover:text-red-500 transition-colors">
+                      <Upload className="h-4 w-4" />
+                      {selectedFile ? 'Đã chọn ảnh' : 'Tải ảnh lên'}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -306,10 +399,10 @@ export default function AdminProductsPage() {
             </div>
             <div className="flex justify-end gap-3 px-6 pb-6">
               <button onClick={() => setShowModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Hủy</button>
-              <button onClick={handleSave} disabled={isSaving || !form.title}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                <Save className="h-4 w-4" /> {isSaving ? 'Đang lưu...' : editingId ? 'Cập nhật' : 'Tạo mới'}
-              </button>
+                <button onClick={handleSave} disabled={isSaving || uploadImage.isPending || !form.title}
+                  className="flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                  <Save className="h-4 w-4" /> {(isSaving || uploadImage.isPending) ? 'Đang xử lý...' : editingId ? 'Cập nhật' : 'Tạo mới'}
+                </button>
             </div>
           </div>
         </div>

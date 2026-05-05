@@ -93,23 +93,7 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT;
-  const server = await app.listen(port, '0.0.0.0');
-
-  const shutdown = async (signal: string) => {
-    logger.log(`Received ${signal}, starting graceful shutdown...`);
-    server.close(async () => {
-      logger.log('HTTP server closed');
-      await app.close();
-      process.exit(0);
-    });
-    setTimeout(() => {
-      logger.error('Forced shutdown after timeout');
-      process.exit(1);
-    }, 30_000);
-  };
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  await app.listen(port, '0.0.0.0');
 
   logger.log(`Application is running on port: ${port}`);
   logger.log(`Swagger docs are available at /api/docs`);
