@@ -7,7 +7,7 @@
 [![Gemini AI](https://img.shields.io/badge/Gemini_AI-Pro-4285F4?style=for-the-badge&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 
 ## 🔗 Live Demo
-[![Website](https://img.shields.io/badge/Website-Live_Demo-blue?style=for-the-badge&logo=vercel&logoColor=white)](https://book-store-nestjs-nextjs.vercel.app)
+[https://book-store-nestjs-nextjs.vercel.app](https://book-store-nestjs-nextjs.vercel.app)
 
 DreamBook is an e-commerce platform dedicated to books, built with modern technologies to provide a secure and convenient shopping experience.
 
