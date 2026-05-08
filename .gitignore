@@ -52,6 +52,7 @@ coverage/
 
 # Data & Logs
 *.txt
+!be/src/ai/knowledge/*.txt
 *.csv
 
 # AI Agent traces

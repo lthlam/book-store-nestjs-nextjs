@@ -146,10 +146,17 @@ export default function SingleProductPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <button type="button" onClick={() => addToCart(product)}
-                className="flex flex-1 items-center justify-center rounded-xl border border-transparent bg-red-600 px-8 py-4 text-base font-bold text-white shadow-sm hover:bg-red-700 transition-all transform hover:scale-[1.02]">
-                <ShoppingCart className="h-5 w-5 mr-2" /> Thêm vào giỏ hàng
-              </button>
+              {product.stock === 0 ? (
+                <button type="button" disabled
+                  className="flex flex-1 items-center justify-center rounded-xl border border-transparent bg-gray-400 px-8 py-4 text-base font-bold text-white shadow-sm cursor-not-allowed">
+                  Hết hàng
+                </button>
+              ) : (
+                <button type="button" onClick={() => addToCart(product)}
+                  className="flex flex-1 items-center justify-center rounded-xl border border-transparent bg-red-600 px-8 py-4 text-base font-bold text-white shadow-sm hover:bg-red-700 transition-all transform hover:scale-[1.02]">
+                  <ShoppingCart className="h-5 w-5 mr-2" /> Thêm vào giỏ hàng
+                </button>
+              )}
               <button type="button" onClick={() => toggleWishlist(product)}
                 className={`flex items-center justify-center rounded-xl border-2 px-8 py-4 transition-all ${isInWishlist(product.id) ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:text-red-500 hover:border-red-200'}`}>
                 <Heart className="h-6 w-6" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />

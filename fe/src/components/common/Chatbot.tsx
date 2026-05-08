@@ -42,14 +42,16 @@ export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   useEffect(() => {
-    setMessages([
-      {
-        id: 'welcome',
-        text: 'Xin chào! Tôi là trợ lý AI của DreamBook. Bạn có thể hỏi tôi về sách, chính sách giao hàng, thanh toán hay bất cứ điều gì! 📚',
-        isBot: true,
-        timestamp: new Date()
-      }
-    ]);
+    Promise.resolve().then(() => {
+      setMessages([
+        {
+          id: 'welcome',
+          text: 'Xin chào! Tôi là trợ lý AI của DreamBook. Bạn có thể hỏi tôi về sách, chính sách giao hàng, thanh toán hay bất cứ điều gì! 📚',
+          isBot: true,
+          timestamp: new Date()
+        }
+      ]);
+    });
   }, []);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -268,12 +270,3 @@ export default function Chatbot() {
   );
 }
 
-// Add these styles to your globals.css or keep here if using styled-components/etc.
-// For now, I'll assume you can add them to a style tag or your main css file.
-const markdownStyles = `
-  .markdown-content p { margin-bottom: 0.5rem; }
-  .markdown-content p:last-child { margin-bottom: 0; }
-  .markdown-content ul, .markdown-content ol { padding-left: 1.25rem; margin-bottom: 0.5rem; }
-  .markdown-content li { margin-bottom: 0.25rem; }
-  .markdown-content strong { font-weight: 700; }
-`;

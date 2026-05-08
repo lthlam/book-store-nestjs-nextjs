@@ -37,6 +37,9 @@ function ProductCard({ book, index }: { book: Product; index?: number }) {
       {book.special && (
         <div className="absolute top-2 left-2 z-20 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-wider">Độc quyền</div>
       )}
+      {book.stock === 0 && (
+        <div className="absolute top-2 right-2 z-20 bg-gray-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-wider">Hết hàng</div>
+      )}
       <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-gray-50 flex items-center justify-center p-2">
         <Image src={book.image} alt={book.title} fill className="object-contain transition-transform duration-500 group-hover:scale-110" unoptimized />
       </div>

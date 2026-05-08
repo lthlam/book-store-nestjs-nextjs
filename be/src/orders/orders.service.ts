@@ -53,9 +53,24 @@ export class OrderService {
         addressData = { street: 'N/A' };
       }
 
+      const orderDetails = createDto.items || createDto.orderDetails || [];
+
+      // Xác thực số lượng tồn kho
+      for (const item of orderDetails) {
+        const product = await this.productService.findOne(item.productId);
+        if (!product) {
+          throw new NotFoundException(`Product ${item.productId} not found`);
+        }
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Sản phẩm ${product.title} không đủ số lượng (còn ${product.stock}, yêu cầu ${item.quantity})`,
+          );
+        }
+      }
+
       const entity = manager.create(Order, {
         user: { id: createDto.userId } as any,
-        orderDetails: createDto.items || createDto.orderDetails || [],
+        orderDetails,
         address: addressData,
         total: createDto.totalAmount || createDto.total || 0,
         shipping: createDto.shipping || 0,
@@ -136,6 +151,13 @@ export class OrderService {
         throw new BadRequestException(
           `Đơn hàng 'shipped' chỉ có thể chuyển sang 'delivered' hoặc 'cancelled'`,
         );
+      }
+      // Deduct stock when delivered (completed)
+      if (target === 'delivered' && current !== 'delivered') {
+        const items = order.orderDetails || [];
+        for (const item of items) {
+          await this.productService.updateStock(item.productId, item.quantity);
+        }
       }
     }
 

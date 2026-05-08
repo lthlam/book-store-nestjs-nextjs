@@ -620,12 +620,18 @@ function ProductsContent() {
                         </div>
 
                         <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2 relative z-20">
-                          <button
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToCart(book); }}
-                            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-700 transition-colors shadow-sm active:scale-95"
-                          >
-                            <ShoppingCart className="h-3.5 w-3.5" /> THÊM
-                          </button>
+                          {book.stock === 0 ? (
+                            <button disabled className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gray-300 px-3 py-1 text-xs font-bold text-gray-500 cursor-not-allowed">
+                              HẾT HÀNG
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); addToCart(book); }}
+                              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white hover:bg-red-700 transition-colors shadow-sm active:scale-95"
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5" /> THÊM
+                            </button>
+                          )}
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(book); }}
                             className={`flex items-center justify-center rounded-lg p-1.5 transition-colors border shadow-sm active:scale-95 ${isInWishlist(book.id)

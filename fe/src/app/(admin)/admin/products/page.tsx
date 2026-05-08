@@ -15,7 +15,7 @@ import {
 import { formatVND } from '@/utils/format';
 import type { Product } from '@/types';
 
-const emptyForm = { title: '', authorId: '', price: '', year: '', description: '', genreId: '', publisherId: '', image: '', special: false };
+const emptyForm = { title: '', authorId: '', price: '', year: '', description: '', genreId: '', publisherId: '', image: '', special: false, stock: '1000' };
 
 export default function AdminProductsPage() {
   const toast = useToast();
@@ -65,7 +65,7 @@ export default function AdminProductsPage() {
   const openAdd = () => { setEditingId(null); setForm(emptyForm); setPreviewUrl(null); setSelectedFile(null); setShowModal(true); };
   const openEdit = (p: Product) => {
     setEditingId(p.id);
-    setForm({ title: p.title || '', authorId: p.author?.id || '', price: String(p.price || ''), year: String(p.year || ''), description: p.description || '', genreId: p.genre?.id || '', publisherId: p.publisher?.id || '', image: p.image || '', special: p.special || false });
+    setForm({ title: p.title || '', authorId: p.author?.id || '', price: String(p.price || ''), year: String(p.year || ''), description: p.description || '', genreId: p.genre?.id || '', publisherId: p.publisher?.id || '', image: p.image || '', special: p.special || false, stock: String(p.stock ?? 1000) });
     setPreviewUrl(null); setSelectedFile(null);
     setShowModal(true);
   };
@@ -154,7 +154,8 @@ export default function AdminProductsPage() {
         description: form.description, 
         genreId: form.genreId, 
         image: imageUrl, 
-        special: form.special 
+        special: form.special,
+        stock: Number(form.stock)
       };
 
       if (editingId) {
@@ -264,7 +265,7 @@ export default function AdminProductsPage() {
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Sản phẩm', 'Thể loại', 'Tác giả', 'Giá', 'Đã bán', ''].map((h) => (
+                  {['Sản phẩm', 'Thể loại', 'Tác giả', 'Giá', 'Kho', 'Đã bán', ''].map((h) => (
                     <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${h === '' ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
@@ -283,6 +284,7 @@ export default function AdminProductsPage() {
                     <td className="px-5 py-3 text-sm text-gray-500">{product.genre?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm text-gray-500 truncate max-w-[120px]">{product.author?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">{formatVND(Number(product.price))}</td>
+                    <td className="px-5 py-3 text-sm font-semibold text-gray-900">{product.stock ?? 1000}</td>
                     <td className="px-5 py-3 text-sm text-gray-500">{product.soldCount ?? 0}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -382,6 +384,10 @@ export default function AdminProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Giá (VND) *</label>
                   <input type="number" placeholder="150000" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Kho *</label>
+                  <input type="number" placeholder="1000" value={form.stock} onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))} className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Năm xuất bản</label>

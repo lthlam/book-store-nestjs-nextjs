@@ -93,31 +93,35 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!selectedAddress || cart.length === 0) return;
 
-    // userId không cần truyền — backend lấy từ JWT
-    const orderData = await createOrder.mutateAsync({
-      addressId: selectedAddress,
-      totalAmount: finalAmount,
-      shipping,
-      discount: couponDiscount,
-      couponCode: couponCode || undefined,
-      status: 'pending',
-      paymentMethod,
-      items: cart.map((item) => ({ productId: item.id, quantity: item.quantity, price: item.product.price })),
-    });
+    try {
+      const orderData = await createOrder.mutateAsync({
+        addressId: selectedAddress,
+        totalAmount: finalAmount,
+        shipping,
+        discount: couponDiscount,
+        couponCode: couponCode || undefined,
+        status: 'pending',
+        paymentMethod,
+        items: cart.map((item) => ({ productId: item.id, quantity: item.quantity, price: item.product.price })),
+      });
 
-    if (orderData.paymentUrl) {
-      window.location.href = orderData.paymentUrl;
-      return;
-    }
+      if (orderData.paymentUrl) {
+        window.location.href = orderData.paymentUrl;
+        return;
+      }
 
-    // Chỉ clear cart và redirect success nếu là COD
-    if (paymentMethod === 'cod') {
-      clearCart();
-      sessionStorage.setItem('lastOrder', JSON.stringify({ total: finalAmount }));
-      router.push('/checkout/success');
-    } else {
-      // Trường hợp chọn online payment nhưng không có URL (lỗi hệ thống)
-      toast.error('Không thể khởi tạo cổng thanh toán. Vui lòng thử lại.');
+      // Chỉ clear cart và redirect success nếu là COD
+      if (paymentMethod === 'cod') {
+        clearCart();
+        sessionStorage.setItem('lastOrder', JSON.stringify({ total: finalAmount }));
+        router.push('/checkout/success');
+      } else {
+        toast.error('Không thể khởi tạo cổng thanh toán. Vui lòng thử lại.');
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string | string[] } }, message?: string };
+      const msg = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi đặt hàng.';
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
     }
   };
 

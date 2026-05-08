@@ -259,4 +259,12 @@ export class ProductService {
         .on('error', (err) => reject(err));
     });
   }
+
+  async updateStock(id: string, quantity: number) {
+    const product = await this.productRepo.findById(id);
+    if (!product) throw new NotFoundException('Product not found');
+    product.stock = product.stock - quantity;
+    if (product.stock < 0) product.stock = 0;
+    return this.productRepo.save(product);
+  }
 }

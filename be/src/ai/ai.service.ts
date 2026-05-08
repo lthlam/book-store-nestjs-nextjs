@@ -210,7 +210,9 @@ Trả lời bằng tiếng Việt, thân thiện, ngắn gọn.`;
     // 2. Insert history before the last user message
     if (history.length > 0) {
       const historyMessages = history.map((msg) =>
-        msg.role === 'model' ? new AIMessage(msg.text) : new HumanMessage(msg.text),
+        msg.role === 'model'
+          ? new AIMessage(msg.text)
+          : new HumanMessage(msg.text),
       );
       // Insert right after the SystemMessage (index 0)
       messages.splice(1, 0, ...historyMessages);

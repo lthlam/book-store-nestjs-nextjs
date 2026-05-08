@@ -65,4 +65,11 @@ export class CreateProductDto {
   @IsOptional()
   @IsUUID()
   publisherId?: string;
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Transform(({ value }) => Number(value))
+  stock?: number;
 }

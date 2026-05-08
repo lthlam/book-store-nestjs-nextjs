@@ -46,8 +46,17 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   }, [cart, wishlist, isMounted]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
+    if (product.stock === 0) {
+      toast.error('Sản phẩm đã hết hàng!');
+      return;
+    }
+    
     const existing = cart.find((item) => item.product.id === product.id);
     if (existing) {
+      if ((product.stock ?? 1000) < existing.quantity + quantity) {
+        toast.error(`Sản phẩm chỉ còn ${product.stock} quyển!`);
+        return;
+      }
       setCart((prev) =>
         prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
@@ -55,6 +64,10 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       );
       toast.success(`Đã cập nhật số lượng trong giỏ hàng`);
     } else {
+      if ((product.stock ?? 1000) < quantity) {
+        toast.error(`Sản phẩm chỉ còn ${product.stock} quyển!`);
+        return;
+      }
       setCart((prev) => [...prev, { id: product.id, product, quantity, price: product.price }]);
       toast.success(`Đã thêm vào giỏ hàng!`);
     }
@@ -67,6 +80,12 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
+    const item = cart.find((i) => i.product.id === productId);
+    if (!item) return;
+    if ((item.product.stock ?? 1000) < quantity) {
+      toast.error(`Sản phẩm chỉ còn ${item.product.stock} quyển!`);
+      return;
+    }
     setCart((prev) =>
       prev.map((item) => (item.product.id === productId ? { ...item, quantity: Math.max(1, quantity) } : item))
     );
