@@ -25,6 +25,7 @@ import { PublishersModule } from './publishers/publishers.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { HealthModule } from './health/health.module';
 import { validate } from './common/configs/env.validation';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { validate } from './common/configs/env.validation';
     PublishersModule,
     ContactsModule,
     HealthModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

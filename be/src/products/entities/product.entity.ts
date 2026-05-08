@@ -41,6 +41,9 @@ export class Product {
   @Column({ default: 0 })
   soldCount: number;
 
+  @Column({ default: 1000 })
+  stock: number;
+
   @Column()
   year: number;
 

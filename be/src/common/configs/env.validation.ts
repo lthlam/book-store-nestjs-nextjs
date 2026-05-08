@@ -90,6 +90,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   COOKIE_DOMAIN: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_API_KEY: string;
 }
 
 export function validate(config: Record<string, unknown>) {
